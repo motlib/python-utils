@@ -16,14 +16,39 @@ import yaml
 
 
 class CmdlApp():
+    cfg_keys = [
+            'main_fct',
+            'has_cfgfile',
+            'reload_on_hup',
+            'tool_name',
+            'tool_version'
+    ]
+    
     def __init__(self):
         # set all config values to default values
-        self.cmdlapp_config()
+        self.configure(
+            has_cfgfile=False,
+            reload_on_hup=False,
+            tool_name=self.__class__.__name__,
+            tool_version='0.0-dev')
+                       
 
+    def configure(self, **args):
+        '''Configure the behavior of the command-line application.
 
-    def cmdlapp_config(self, has_cfgfile=False, reload_on_hup=False):
-        self.has_cfgfile = has_cfgfile
-        self.reload_on_hup = reload_on_hup
+        :param function-pointer main_fct: The function to run when the tool is
+          started.
+        :param bool use_cfgfile: If set to True, a '--config' parameter is added
+          to the command-line options and the given file (YAML format) expected
+          is loaded and provided as the cfg member variable.
+        '''
+
+        for key in args.keys():
+            if key not in CmdlApp.cfg_keys:
+                msg = "Invalid config parameter '{0}'."
+                raise ValueError(msg.format(key))
+
+            setattr(self, key, args[key])
 
 
     def setup_args(self):
@@ -42,7 +67,8 @@ class CmdlApp():
         if self.has_cfgfile == True:
             self.parser.add_argument(
                 '-c', '--cfg',
-                help='Path to the YAML config file.')
+                help='Path to the YAML config file.',
+                required=True)
 
     
     def setup_logging(self):
@@ -65,6 +91,12 @@ class CmdlApp():
             lcfg['filemode'] = 'a'
 
         logging.basicConfig(**lcfg)
+
+        # Print tool name and version
+        msg = '{tool_name} {tool_version} starting.'
+        logging.info(msg.format(
+            tool_name=self.tool_name,
+            tool_version=self.tool_version))
 
         msg = "Logging system initialized to level '{0}'."
         logging.info(msg.format(levelname))
@@ -106,7 +138,7 @@ class CmdlApp():
         self.args = self.parser.parse_args()
 
         self.setup_logging()
-
+        
         if self.reload_on_hup:
             # register SIGHUP listener to reload config file. 
             signal.signal(signal.SIGHUP, self.sighup_handler)
@@ -145,3 +177,8 @@ class CmdlApp():
         else:
             # ignore any other signal
             pass
+
+        
+    def main_fct(self):
+        logging.info('Called the default main function implementation.')
+        
